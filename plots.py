@@ -3,4 +3,4 @@ import streamlit as st
 import plotly.graph_objs as go
 
 st.text_input('Assets')
-go.Heatmap()
+fig = go.Figure(data=go.Heatmap())
