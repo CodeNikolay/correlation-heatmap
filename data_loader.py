@@ -13,3 +13,8 @@ def get_returns(tickers, start, end):
     prices_df = get_prices(tickers, start, end)
     returns_df = prices_to_returns(prices_df)
     return returns_df
+
+def get_reindexed_prices(tickers, start, end):
+    prices_df = get_prices(tickers, start, end)
+    reindexed_prices = (prices_df / prices_df.iloc[0]) * 100
+    return reindexed_prices
