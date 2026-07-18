@@ -1,6 +1,6 @@
-import streamlit as st
 import plotly.graph_objs as go
 from data_loader import *
+from correlations import get_correlation
 
 ASSET_DICT = {
     'S&P 500': 'SPY',
@@ -12,10 +12,12 @@ ASSET_DICT = {
     'Utilities': 'XLU'
 }
 
+@st.cache_data
 def assets_to_tickers(assets):
     return [ASSET_DICT[asset] for asset in assets]
 
 st.set_page_config(layout="wide")
+
 col1, col2 = st.columns([1, 2])
 assets = col1.multiselect('Assets', list(ASSET_DICT.keys()), default=list(ASSET_DICT.keys()))
 col11, col12 = col1.columns(2)
@@ -26,6 +28,7 @@ if 'start_date' not in st.session_state:
 if 'end_date' not in st.session_state:
     st.session_state.end_date = 'today'
 
+# dynamic min and max values
 start_date = col11.date_input(
     'Start',
     value=st.session_state.start_date,
@@ -44,9 +47,10 @@ tickers = assets_to_tickers(assets)
 returns_df = get_returns(tickers, start_date, end_date)
 reindexed_prices_df = get_reindexed_prices(tickers, start_date, end_date)
 
-chart_placeholder = col2.empty()
+chart_placeholder = col2.container(height=500, border=False)
 
-corr_window = col2.slider(
+_, slider_col, _ = col2.columns([5, 130, 1]) # adjust slider width with columns, as there's no width parameter for st.slider()
+corr_window = slider_col.slider(
     'Correlation window',
     min_value=start_date,
     max_value=end_date,
@@ -55,7 +59,7 @@ corr_window = col2.slider(
 )
 
 window_start, window_end = corr_window
-corr = returns_df.loc[window_start:window_end].corr()
+corr = get_correlation(returns_df, window_start, window_end)
 
 fig1 = go.Figure()
 for ticker in reindexed_prices_df.columns:
@@ -72,7 +76,8 @@ fig1.update_layout(
     ),
     margin=dict(l=50, r=20, t=80, b=20),
 )
-chart_placeholder.plotly_chart(fig1)
+with chart_placeholder:
+    st.plotly_chart(fig1, width='stretch')
 
 fig2 = go.Figure(data=go.Heatmap(
     z = corr.values,

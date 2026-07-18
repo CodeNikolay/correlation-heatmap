@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
+import streamlit as st
 
-def get_correlations(returns_df: pd.DataFrame, window=21, step=1):
-    corr_df = returns_df.rolling(window=window).corr()
-    return corr_df
-
+@st.cache_data
+def get_correlation(returns_df: pd.DataFrame, start, end):
+    return returns_df.loc[start:end].corr()
