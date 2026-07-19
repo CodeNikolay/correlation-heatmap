@@ -1,4 +1,7 @@
+from datetime import datetime
+
 import plotly.graph_objs as go
+
 from data_loader import *
 from correlations import get_correlation
 
@@ -49,16 +52,24 @@ reindexed_prices_df = get_reindexed_prices(tickers, start_date, end_date)
 
 chart_placeholder = col2.container(height=500, border=False)
 
+if 'corr_window' not in st.session_state:
+    st.session_state.corr_window = (start_date, end_date)
+
+if st.session_state.corr_window[0] < start_date or st.session_state.corr_window[0] > end_date:
+    st.session_state.corr_window = (start_date, st.session_state.corr_window[1])
+if st.session_state.corr_window[1] > end_date or st.session_state.corr_window[1] < start_date:
+    st.session_state.corr_window = (st.session_state.corr_window[0], end_date)
+
 _, slider_col, _ = col2.columns([5, 130, 1]) # adjust slider width with columns, as there's no width parameter for st.slider()
-corr_window = slider_col.slider(
+window_start, window_end = slider_col.slider(
     'Correlation window',
     min_value=start_date,
     max_value=end_date,
-    value=(start_date, end_date),
-    format='DD/MM/YYYY'
+    value=(st.session_state.corr_window[0], st.session_state.corr_window[1]),
+    format='DD/MM/YYYY',
+    key='corr_window'
 )
 
-window_start, window_end = corr_window
 corr = get_correlation(returns_df, window_start, window_end)
 
 fig1 = go.Figure()
