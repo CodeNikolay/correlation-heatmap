@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import timedelta
 
 import plotly.graph_objs as go
 
@@ -35,13 +35,13 @@ if 'end_date' not in st.session_state:
 start_date = col11.date_input(
     'Start',
     value=st.session_state.start_date,
-    max_value=st.session_state.end_date,
+    max_value=st.session_state.end_date - timedelta(days=1),
     key='start_date'
 )
 end_date = col12.date_input(
     'End',
     value=st.session_state.end_date,
-    min_value=st.session_state.start_date,
+    min_value=st.session_state.start_date + timedelta(days=1),
     max_value='today',
     key='end_date'
 )
