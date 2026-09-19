@@ -1,65 +1,99 @@
-from datetime import timedelta
-
+import datetime as dt
 import plotly.graph_objs as go
+import pandas as pd
 
 from data_loader import *
 from correlations import get_correlation
 
-ASSET_DICT = {
-    'S&P 500': 'SPY',
-    'Nasdaq 100': 'QQQ',
-    'Financials': 'XLF',
-    'Energy': 'XLE',
-    'Healthcare': 'XLV',
-    'Industrials': 'XLI',
-    'Utilities': 'XLU'
-}
+ASSETS = [('SPY', 0), ('QQQ', 0), ('XLF', 0), ('XLE', 0), ('XLV', 0), ('XLI', 0), ('XLU', 0)]
 
-@st.cache_data
-def assets_to_tickers(assets):
-    return [ASSET_DICT[asset] for asset in assets]
+# initialize persistent state for custom assets
+if "custom_assets_names" not in st.session_state:
+    st.session_state.custom_assets_names = []
+
+if "custom_assets_df" not in st.session_state:
+    st.session_state.custom_assets_df = pd.DataFrame()
+
+def add_custom_asset():
+    """Process the newly uploaded asset."""
+    new_asset = st.session_state.new_asset
+    name = st.session_state.new_asset_name
+
+    if new_asset is None or not name:
+        return
+
+    new_asset_df = pd.read_csv(new_asset, index_col='Date', sep=';')
+    new_asset_df.rename(
+        columns={new_asset_df.columns[0]: name},
+        inplace=True
+    )
+    new_asset_df.index = pd.to_datetime(new_asset_df.index)
+    new_asset_df[name].apply(lambda x: x.strip('$€'))
+    new_asset_df[name] = pd.to_numeric(new_asset_df[name])
+
+    st.session_state.custom_assets_names.append((name, 1))
+
+    st.session_state.custom_assets_df = (
+        st.session_state.custom_assets_df.join(
+            new_asset_df,
+            how="outer"
+        )
+    )
 
 st.set_page_config(layout="wide")
 
 col1, col2 = st.columns([1, 2])
-assets = col1.multiselect('Assets', list(ASSET_DICT.keys()), default=list(ASSET_DICT.keys()))
-col11, col12 = col1.columns(2)
+assets = col1.multiselect('Assets', ASSETS + st.session_state.custom_assets_names, format_func=lambda x: x[0], default=ASSETS)
 
-# initialize session state once
+# initialize session state once for correlation window
 if 'start_date' not in st.session_state:
-    st.session_state.start_date = '2026-01-01'
+    st.session_state.start_date = dt.date.fromisoformat('2026-01-01')
 if 'end_date' not in st.session_state:
-    st.session_state.end_date = 'today'
+    st.session_state.end_date = dt.date.today()
 
 # dynamic min and max values
+col11, col12 = col1.columns(2)
 start_date = col11.date_input(
-    'Start',
+    label='Start',
     value=st.session_state.start_date,
-    max_value=st.session_state.end_date - timedelta(days=1),
+    max_value=st.session_state.end_date - dt.timedelta(days=1),
     key='start_date'
 )
 end_date = col12.date_input(
-    'End',
+    label='End',
     value=st.session_state.end_date,
-    min_value=st.session_state.start_date + timedelta(days=1),
+    min_value=st.session_state.start_date + dt.timedelta(days=1),
     max_value='today',
     key='end_date'
 )
 
-tickers = assets_to_tickers(assets)
-returns_df = get_returns(tickers, start_date, end_date)
-reindexed_prices_df = get_reindexed_prices(tickers, start_date, end_date)
 
+new_asset_name = col1.text_input(
+    label="Name of new asset",
+    key="new_asset_name"
+)
+
+new_asset = col1.file_uploader(
+    label="Upload asset file",
+    type="csv",
+    key="new_asset",
+    on_change=add_custom_asset
+)
+
+# reserve space for assets history chart
 chart_placeholder = col2.container(height=500, border=False)
 
+# initialize correlation window with full history window
 if 'corr_window' not in st.session_state:
     st.session_state.corr_window = (start_date, end_date)
 
+# constraints for correlation window
 if st.session_state.corr_window[0] < start_date or st.session_state.corr_window[0] > end_date:
     st.session_state.corr_window = (start_date, st.session_state.corr_window[1])
 if st.session_state.corr_window[1] > end_date or st.session_state.corr_window[1] < start_date:
     st.session_state.corr_window = (st.session_state.corr_window[0], end_date)
 
+# correlation window slider
 _, slider_col, _ = col2.columns([5, 130, 1]) # adjust slider width with columns, as there's no width parameter for st.slider()
 window_start, window_end = slider_col.slider(
     'Correlation window',
@@ -70,8 +104,21 @@ window_start, window_end = slider_col.slider(
     key='corr_window'
 )
 
+# get assets history, returns and correlation
+selected_tickers = [x[0] for x in assets if not x[1]]
+selected_custom_assets = [x[0] for x in assets if x[1]]
+
+tickers_prices_df = get_prices(selected_tickers, start_date, end_date)
+custom_prices_df = st.session_state.custom_assets_df[selected_custom_assets]
+prices_df = tickers_prices_df.join(custom_prices_df, how='outer')
+
+returns_df = prices_to_returns(prices_df)
+
+reindexed_prices_df = get_reindexed_prices(prices_df)
+
 corr = get_correlation(returns_df, window_start, window_end)
 
+# assets history chart
 fig1 = go.Figure()
 for ticker in reindexed_prices_df.columns:
     fig1.add_trace(go.Scatter(x=reindexed_prices_df.index, y=reindexed_prices_df[ticker], mode='lines', name=ticker))
@@ -90,6 +137,7 @@ fig1.update_layout(
 with chart_placeholder:
     st.plotly_chart(fig1, width='stretch')
 
+# correlation heatmap
 fig2 = go.Figure(data=go.Heatmap(
     z = corr.values,
     x = corr.columns.tolist(),

@@ -12,7 +12,7 @@ To run the visualizer, follow these steps:
    ```bash
    cd [Your path to the downloaded repo folder] # you may skip this step if you open Git Bash in the desired folder
    
-   python -m venv venv # omit after initial setup
+   python3 -m venv venv # omit after initial setup
    source venv/Scripts/activate
    pip install -r requirements.txt # omit after initial setup
    
@@ -23,7 +23,7 @@ To run the visualizer, follow these steps:
    ```bash
    cd [Your path to the downloaded repo folder]
    
-   python -m venv venv # omit after initial setup
+   python3 -m venv venv # omit after initial setup
    source venv/bin/activate
    pip install -r requirements.txt # omit after initial setup
    
