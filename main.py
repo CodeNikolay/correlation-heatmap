@@ -28,8 +28,14 @@ def add_custom_asset():
         inplace=True
     )
     new_asset_df.index = pd.to_datetime(new_asset_df.index)
-    new_asset_df[name].apply(lambda x: x.strip('$€'))
-    new_asset_df[name] = pd.to_numeric(new_asset_df[name])
+    if new_asset_df[name].dtype == 'str':
+        new_asset_df[name] = (
+            new_asset_df[name]
+            .str.replace('$', '', regex=False)
+            .astype(float)
+        )
+    else:
+        new_asset_df[name] = new_asset_df[name].astype(float)
 
     st.session_state.custom_assets_names.append((name, 1))
 
@@ -43,7 +49,20 @@ def add_custom_asset():
 st.set_page_config(layout="wide")
 
 col1, col2 = st.columns([1, 2])
-assets = col1.multiselect('Assets', ASSETS + st.session_state.custom_assets_names, format_func=lambda x: x[0], default=ASSETS)
+
+if "assets" not in st.session_state:
+    st.session_state.assets = ASSETS + st.session_state.custom_assets_names
+
+assets = col1.multiselect(
+    'Assets',
+    ASSETS + st.session_state.custom_assets_names,
+    format_func=lambda x: x[0],
+    default=st.session_state.assets
+)
+
+if not assets:
+    col1.warning("Please select at least one asset.")
+    st.stop()
 
 # initialize session state once for correlation window
 if 'start_date' not in st.session_state:
@@ -67,18 +86,23 @@ end_date = col12.date_input(
     key='end_date'
 )
 
+with col1.container(border=True):
+    st.markdown("#### Add new asset")
 
-new_asset_name = col1.text_input(
-    label="Name of new asset",
-    key="new_asset_name"
-)
+    new_asset_name = st.text_input(
+        "Name of new asset",
+        key="new_asset_name"
+    )
 
-new_asset = col1.file_uploader(
-    label="Upload asset file",
-    type="csv",
-    key="new_asset",
-    on_change=add_custom_asset
-)
+    if new_asset_name:
+        new_asset = st.file_uploader(
+            "Upload asset file",
+            type="csv",
+            key="new_asset",
+            on_change=add_custom_asset
+        )
+    else:
+        st.empty()
 
 # reserve space for assets history chart
 chart_placeholder = col2.container(height=500, border=False)
@@ -110,6 +134,7 @@ selected_custom_assets = [x[0] for x in assets if x[1]]
 
 tickers_prices_df = get_prices(selected_tickers, start_date, end_date)
 custom_prices_df = st.session_state.custom_assets_df[selected_custom_assets]
+custom_prices_df = custom_prices_df.loc[start_date:end_date]
 prices_df = tickers_prices_df.join(custom_prices_df, how='outer')
 
 returns_df = prices_to_returns(prices_df)

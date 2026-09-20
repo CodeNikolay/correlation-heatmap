@@ -9,7 +9,7 @@ def get_prices(tickers, start, end):
 
 @st.cache_data
 def prices_to_returns(prices_df):
-    return np.log(prices_df.pct_change().add(1)).dropna()
+    return np.log(prices_df.pct_change().add(1)).dropna(how='all')
 
 @st.cache_data
 def get_returns(tickers, start, end):
