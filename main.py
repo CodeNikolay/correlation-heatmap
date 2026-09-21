@@ -1,6 +1,7 @@
 import datetime as dt
 import plotly.graph_objs as go
 import pandas as pd
+import streamlit
 
 from data_loader import *
 from correlations import get_correlation
@@ -107,39 +108,40 @@ with col1.container(border=True):
 # reserve space for assets history chart
 chart_placeholder = col2.container(height=500, border=False)
 
+# get assets history and returns
+selected_tickers = [x[0] for x in assets if not x[1]]
+selected_custom_assets = [x[0] for x in assets if x[1]]
+
+if selected_tickers:
+    tickers_prices_df = get_prices(selected_tickers, start_date, end_date)
+custom_prices_df = st.session_state.custom_assets_df[selected_custom_assets]
+custom_prices_df = custom_prices_df.loc[start_date:end_date]
+prices_df = custom_prices_df.join(tickers_prices_df, how='outer') if selected_tickers else custom_prices_df
+
+returns_df = prices_to_returns(prices_df)
+reindexed_prices_df = get_reindexed_prices(prices_df)
+max_date = reindexed_prices_df.index[-1].date()
+
 # initialize correlation window with full history window
 if 'corr_window' not in st.session_state:
-    st.session_state.corr_window = (start_date, end_date)
+    st.session_state.corr_window = (start_date, max_date)
 
 # constraints for correlation window
-if st.session_state.corr_window[0] < start_date or st.session_state.corr_window[0] > end_date:
+if st.session_state.corr_window[0] < start_date or st.session_state.corr_window[0] > max_date:
     st.session_state.corr_window = (start_date, st.session_state.corr_window[1])
-if st.session_state.corr_window[1] > end_date or st.session_state.corr_window[1] < start_date:
-    st.session_state.corr_window = (st.session_state.corr_window[0], end_date)
+if st.session_state.corr_window[1] > max_date or st.session_state.corr_window[1] < start_date:
+    st.session_state.corr_window = (st.session_state.corr_window[0], max_date)
 
 # correlation window slider
 _, slider_col, _ = col2.columns([5, 130, 1]) # adjust slider width with columns, as there's no width parameter for st.slider()
 window_start, window_end = slider_col.slider(
     'Correlation window',
     min_value=start_date,
-    max_value=end_date,
+    max_value=max_date,
     value=(st.session_state.corr_window[0], st.session_state.corr_window[1]),
     format='DD/MM/YYYY',
     key='corr_window'
 )
-
-# get assets history, returns and correlation
-selected_tickers = [x[0] for x in assets if not x[1]]
-selected_custom_assets = [x[0] for x in assets if x[1]]
-
-tickers_prices_df = get_prices(selected_tickers, start_date, end_date)
-custom_prices_df = st.session_state.custom_assets_df[selected_custom_assets]
-custom_prices_df = custom_prices_df.loc[start_date:end_date]
-prices_df = tickers_prices_df.join(custom_prices_df, how='outer')
-
-returns_df = prices_to_returns(prices_df)
-
-reindexed_prices_df = get_reindexed_prices(prices_df)
 
 corr = get_correlation(returns_df, window_start, window_end)
 

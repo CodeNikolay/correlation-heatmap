@@ -12,7 +12,7 @@ To run the visualizer, follow these steps:
    ```bash
    cd [Your path to the downloaded repo folder] # you may skip this step if you open Git Bash in the desired folder
    
-   python3 -m venv venv # omit after initial setup
+   python -m venv venv # omit after initial setup
    source venv/Scripts/activate
    pip install -r requirements.txt # omit after initial setup
    
@@ -23,7 +23,7 @@ To run the visualizer, follow these steps:
    ```bash
    cd [Your path to the downloaded repo folder]
    
-   python3 -m venv venv # omit after initial setup
+   python -m venv venv # omit after initial setup
    source venv/bin/activate
    pip install -r requirements.txt # omit after initial setup
    
@@ -42,3 +42,6 @@ You may see the window in the chart depicted by the highlighted area.
 correlation value.
 
 ### Upload own files
+1. In the "Add new asset"-box, type in the name of the new asset
+2. A file upload option will appear, where you can select and upload your desired CSV-file. The CSV-file should contain a column with the Dates and a column with the corresponding prices.
+3. After you upload your file, it is added to the asset selection on top, where you can use it as any other asset.
